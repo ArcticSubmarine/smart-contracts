@@ -132,7 +132,8 @@ abstract contract Context {
     }
 
     function _msgData() internal view virtual returns (bytes calldata) {
-        this; // silence state mutability warning without generating bytecode - see https://github.com/ethereum/solidity/issues/2691
+        this;
+        // silence state mutability warning without generating bytecode - see https://github.com/ethereum/solidity/issues/2691
         return msg.data;
     }
 }
@@ -178,7 +179,7 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
     /**
      * @dev Sets the values for {name} and {symbol}.
      *
-     * The defaut value of {decimals} is 18. To select a different value for
+     * The default value of {decimals} is 18. To select a different value for
      * {decimals} you should overload it.
      *
      * All two of these values are immutable: they can only be set once during
@@ -544,6 +545,7 @@ contract BridgeToken is ERC20Burnable {
         address tokenContract;
         uint256 supply;
     }
+
     mapping(address => SwapToken) swapTokens;
 
     mapping(uint256 => bool) public chainIds;
@@ -648,7 +650,7 @@ contract BridgeToken is ERC20Burnable {
         // If the swap token is not already supported, add it with the total supply of supplyIncrement.
         // Otherwise, increment the current supply.
         if (swapTokens[contractAddress].tokenContract == address(0)) {
-            swapTokens[contractAddress] = SwapToken({ tokenContract: contractAddress, supply: supplyIncrement });
+            swapTokens[contractAddress] = SwapToken({tokenContract : contractAddress, supply : supplyIncrement});
         } else {
             swapTokens[contractAddress].supply = swapTokens[contractAddress].supply + supplyIncrement;
         }

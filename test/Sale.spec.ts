@@ -418,7 +418,7 @@ describe('Sale', () => {
       await Sale.close();
 
       expect(await Sale.owner()).to.equals(ZERO_ADDRESS);
-      expect(await DPS.balanceOf(await Sale.address)).to.equals(0);
+      expect(await DPS.balanceOf(Sale.address)).to.equals(0);
       expect(await DPS.balanceOf(saleOwner)).to.equals(initialBalance.add(remaining));
     });
 
