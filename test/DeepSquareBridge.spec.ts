@@ -10,7 +10,7 @@ import IERC20Metadata from '../typings/openzeppelin/IERC20Metadata';
 import { createERC20Agent, ERC20Agent } from './testing/ERC20Agent';
 import setup from './testing/setup';
 
-describe('DeepSquareBridge', () => {
+describe.only('DeepSquareBridge', () => {
   let owner: SignerWithAddress;
   let accounts: SignerWithAddress[];
   let DPS: DeepSquare;
@@ -29,11 +29,11 @@ describe('DeepSquareBridge', () => {
     config: Partial<{ balanceSQA: number; balanceDPS: number; approved: number; tier: number }>,
   ) {
     if (config.balanceSQA && config.balanceSQA > 0) {
-      await agentSQA.transfer(account, config.balanceSQA);
+      await agentSQA.transfer(account, config.balanceSQA, 18);
     }
 
     if (config.balanceDPS && config.balanceDPS > 0) {
-      await agentDPS.transfer(account, config.balanceDPS);
+      await agentDPS.transfer(account, config.balanceDPS, 18);
     }
 
     if (config.approved && config.approved > 0) {
@@ -65,8 +65,8 @@ describe('DeepSquareBridge', () => {
 
     await Security.grantRole(ethers.utils.id('SPENDER'), DeepSquareBridge.address);
 
-    await SQA.transfer(DeepSquareBridge.address, (await SQA.balanceOf(owner.address)).sub(2000));
-    await DPS.transfer(DeepSquareBridge.address, (await DPS.balanceOf(owner.address)).sub(3000));
+    await SQA.transfer(DeepSquareBridge.address, agentSQA.unit(10000));
+    await DPS.transfer(DeepSquareBridge.address, agentDPS.unit(10000));
   });
 
   describe('constructor', () => {
@@ -113,21 +113,27 @@ describe('DeepSquareBridge', () => {
 
   describe('swapDPSToSQA', () => {
     it.only('should let user buy SQA tokens against DPS and emit a SwapDPSToSQA event', async () => {
-      const initialSold: BigNumber = await DeepSquareBridge.remainingSQA();
-      await setupAccount(accounts[0], { balanceSQA: 0, balanceDPS: 1, approved: 1000, tier: 1 });
+      const initialSoldSQA: BigNumber = await DeepSquareBridge.remainingSQA();
+      const initialSoldDPS: BigNumber = await DeepSquareBridge.remainingDPS();
+      await setupAccount(accounts[0], { balanceSQA: 0, balanceDPS: 30000, approved: 10000, tier: 3 });
 
-      // await agentDPS.expectBalanceOf(accounts[0], 30000);
-      // await expect(DeepSquareBridge.connect(accounts[0]).swapDPSToSQA(agentDPS.unit(1000)))
-      //   .to.emit(DeepSquareBridge, 'SwapDPSToSQA')
-      //   .withArgs(accounts[0].address, agentSQA.unit(1000));
-      //
-      // await agentDPS.expectBalanceOf(accounts[0], 29000);
-      // await agentSQA.expectBalanceOf(accounts[0], 1000);
-      //
-      // expect(await DeepSquareBridge.remainingSQA()).to.equals(
-      //   initialSold.sub(await SQA.balanceOf(accounts[0].address)),
-      //   'bridge state is not decremented',
-      // );
+      await agentDPS.expectBalanceOf(accounts[0], agentDPS.unit(30000));
+      await expect(DeepSquareBridge.swapDPSToSQA(agentDPS.unit(1000)))
+        .to.emit(DeepSquareBridge, 'SwapDPSToSQA')
+        .withArgs(accounts[0].address, agentSQA.unit(1000));
+
+      await agentDPS.expectBalanceOf(accounts[0], 29000);
+      await agentSQA.expectBalanceOf(accounts[0], agentSQA.unit(1000));
+
+      expect(await DeepSquareBridge.remainingSQA()).to.equals(
+        initialSoldSQA.sub(await SQA.balanceOf(accounts[0].address)),
+        'bridge state is not decremented',
+      );
+
+      expect(await DeepSquareBridge.remainingDPS()).to.equals(
+        initialSoldDPS.sub(await DPS.balanceOf(accounts[0].address)),
+        'bridge state is not incremented',
+      );
     });
 
     it('should revert if investor is the owner', async () => {
@@ -192,83 +198,4 @@ describe('DeepSquareBridge', () => {
       );
     });
   });
-
-  // describe('deliverDPS', () => {
-  //   it('should deliver tokens to the investor and emit a Purchase event', async () => {
-  //     await setupAccount(accounts[0], { tier: 1 });
-  //     await expect(DeepSquareBridge.deliverDPS(agentSQA.unit(1000), accounts[0].address))
-  //       .to.emit(DeepSquareBridge, 'Purchase')
-  //       .withArgs(accounts[0].address, agentDPS.unit(2500));
-  //   });
-  //
-  //   it('should revert if caller is not the owner', async () => {
-  //     await setupAccount(accounts[0], { tier: 1 });
-  //     await expect(
-  //       DeepSquareBridge.connect(accounts[0]).deliverDPS(agentSQA.unit(1000), accounts[0].address),
-  //     ).to.be.revertedWith('Ownable: caller is not the owner');
-  //   });
-  //
-  //   it('should revert if beneficiary is the owner', async () => {
-  //     await setupAccount(owner, { tier: 1 });
-  //     await expect(DeepSquareBridge.deliverDPS(agentSQA.unit(1000), owner.address)).to.be.revertedWith(
-  //       'DeepSquareBridge: investor is the sale owner',
-  //     );
-  //   });
-  //
-  //   it('should revert if beneficiary is not eligible', async () => {
-  //     await expect(DeepSquareBridge.deliverDPS(agentSQA.unit(1000), accounts[0].address)).to.be.revertedWith(
-  //       'DeepSquareBridge: account is not eligible',
-  //     );
-  //   });
-  //
-  //   it('should revert if beneficiary max investment is reached', async () => {
-  //     await setupAccount(accounts[0], { tier: 1 });
-  //
-  //     await expect(DeepSquareBridge.deliverDPS(agentSQA.unit(7000), accounts[0].address))
-  //       .to.emit(DeepSquareBridge, 'Purchase')
-  //       .withArgs(accounts[0].address, agentDPS.unit(17500));
-  //     await expect(DeepSquareBridge.deliverDPS(agentSQA.unit(8000), accounts[0].address))
-  //       .to.emit(DeepSquareBridge, 'Purchase')
-  //       .withArgs(accounts[0].address, agentDPS.unit(20000));
-  //     await expect(DeepSquareBridge.deliverDPS(agentSQA.unit(1000), accounts[0].address)).to.be.revertedWith(
-  //       'DeepSquareBridge: exceeds tier limit',
-  //     );
-  //   });
-  //
-  //   it('should revert if there are not enough DPS tokens left', async () => {
-  //     await setupAccount(accounts[3], { tier: 3 });
-  //     const remainingSQA: BigNumber = await DeepSquareBridge.convertDPStoSQA(await DeepSquareBridge.remaining());
-  //     await DeepSquareBridge.deliverDPS(remainingSQA, accounts[3].address);
-  //
-  //     await setupAccount(accounts[0], { tier: 1 });
-  //     await expect(DeepSquareBridge.deliverDPS(agentSQA.unit(1000), accounts[0].address)).to.be.revertedWith(
-  //       'DeepSquareBridge: no enough tokens remaining',
-  //     );
-  //   });
-  // });
-  //
-  // describe('close', () => {
-  //   it('should transfer all its DPS to DPS owner and renounce ownership', async () => {
-  //     const remaining = await DeepSquareBridge.remaining();
-  //     const saleOwner = await DeepSquareBridge.owner();
-  //     const initialBalance = await DPS.balanceOf(saleOwner);
-  //
-  //     await DeepSquareBridge.close();
-  //
-  //     expect(await DeepSquareBridge.owner()).to.equals(ZERO_ADDRESS);
-  //     expect(await DPS.balanceOf(await DeepSquareBridge.address)).to.equals(0);
-  //     expect(await DPS.balanceOf(saleOwner)).to.equals(initialBalance.add(remaining));
-  //   });
-  //
-  //   it('should revert if the DPS contract does not have the owner function', async () => {
-  //     // Configure a new Sale contract with a dummy ERC20 token
-  //     const ERC20Factory = await ethers.getContractFactory('@openzeppelin/contracts/token/ERC20/ERC20.sol:ERC20');
-  //     const ERC20 = await ERC20Factory.deploy('DeepSquare no owner', 'DPS');
-  //     const SaleFactory = await ethers.getContractFactory('DeepSquareBridge');
-  //     DeepSquareBridge = await SaleFactory.deploy(ERC20.address, SQA.address, Eligibility.address, 40, MINIMUM_PURCHASE_SQA, 0);
-  //     await Security.grantRole(ethers.utils.id('SPENDER'), DeepSquareBridge.address);
-  //
-  //     await expect(DeepSquareBridge.close()).to.be.revertedWith('DeepSquareBridge: unable to determine owner');
-  //   });
-  // });
 });

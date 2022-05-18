@@ -109,6 +109,18 @@ contract DeepSquareBridge is Ownable {
     }
 
     /**
+     * @notice Deliver the SQA to the account.
+     * @dev Requirements:
+     * - there are enough SQA remaining.
+     * @param account The account that will receive the SQA.
+     * @param amount The amount of SQA to transfer.
+     */
+    function _transferSQA(address account, uint256 amount) internal {
+        _validate(account);
+        SQA.transfer(account, amount);
+    }
+
+    /**
      * @notice Buy DPS with stablecoins.
      * @param amount The amount of stablecoin to invest.
      */
@@ -133,27 +145,15 @@ contract DeepSquareBridge is Ownable {
     }
 
     /**
-     * @notice Deliver the SQA to the account.
-     * @dev Requirements:
-     * - there are enough SQA remaining.
-     * @param account The account that will receive the SQA.
-     * @param amount The amount of SQA to transfer.
-     */
-    function _transferSQA(address account, uint256 amount) internal {
-        _validate(account);
-        SQA.transfer(account, amount);
-    }
-
-    /**
      * @notice Buy stablecoins with DPS.
      * @param amount The amount of DPS to invest.
      */
-    function swapDPSToSQA(address account, uint256 amount) external {
+    function swapDPSToSQA(uint256 amount) external {
         require(amount > 0, "DeepSquareBridge: amount is not greater than 0");
         // Purchase limit from the eligibility.
         uint256 limit = _validate(msg.sender);
 
-        uint256 investment = DPS.balanceOf(account) + amount;
+        uint256 investment = DPS.balanceOf(msg.sender) + amount;
 
         if (limit != 0) {
             // zero limit means that the tier has no restrictions
@@ -165,6 +165,6 @@ contract DeepSquareBridge is Ownable {
 
         DPS.transferFrom(msg.sender, owner(), amount);
         _transferSQA(msg.sender, amount);
-        emit SwapDPSToSQA(account, amount);
+        emit SwapDPSToSQA(msg.sender, amount);
     }
 }
